@@ -44,7 +44,28 @@ var serviceHeaders = map[string]map[string]string{
 	},
 }
 
-func createStreamURL(baseURL, service, videoURL, filename string, headers map[string]string) string {
+// getBaseURL builds base URL dynamically from request headers
+func getBaseURL(c *fiber.Ctx) string {
+	// determine protocol
+	proto := c.Get("X-Forwarded-Proto")
+	if proto == "" {
+		if c.Protocol() == "https" {
+			proto = "https"
+		} else {
+			proto = "http"
+		}
+	}
+
+	// determine host
+	host := c.Get("X-Forwarded-Host")
+	if host == "" {
+		host = c.Hostname()
+	}
+
+	return fmt.Sprintf("%s://%s", proto, host)
+}
+
+func createStreamURL(c *fiber.Ctx, service, videoURL, filename string, headers map[string]string) string {
 	streamID := generateStreamID()
 	exp := time.Now().Add(streamLifespan)
 
@@ -63,6 +84,7 @@ func createStreamURL(baseURL, service, videoURL, filename string, headers map[st
 	// create signature
 	sig := signStream(streamID, exp.Unix())
 
+	baseURL := getBaseURL(c)
 	return fmt.Sprintf("%s/tunnel?id=%s&exp=%d&sig=%s", baseURL, streamID, exp.Unix(), sig)
 }
 

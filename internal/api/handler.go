@@ -27,14 +27,12 @@ type Request struct {
 type Handler struct {
 	tiktok  *tiktok.Service
 	twitter *twitter.Service
-	baseURL string
 }
 
-func NewHandler(userAgent, baseURL string) *Handler {
+func NewHandler(userAgent string) *Handler {
 	return &Handler{
 		tiktok:  tiktok.NewService(userAgent),
 		twitter: twitter.NewService(userAgent),
-		baseURL: baseURL,
 	}
 }
 
@@ -86,7 +84,7 @@ func (h *Handler) handleTikTok(c *fiber.Ctx, u *url.URL, req *Request) error {
 		for i, img := range result.Images {
 			// proxy images through tunnel
 			filename := fmt.Sprintf("%s_%d.jpg", result.VideoFilename, i+1)
-			tunnelURL := createStreamURL(h.baseURL, "tiktok", img, filename, headers)
+			tunnelURL := createStreamURL(c, "tiktok", img, filename, headers)
 			items = append(items, PickerItem{
 				Type: "photo",
 				URL:  tunnelURL,
@@ -95,7 +93,7 @@ func (h *Handler) handleTikTok(c *fiber.Ctx, u *url.URL, req *Request) error {
 
 		var audioTunnelURL string
 		if result.AudioURL != "" {
-			audioTunnelURL = createStreamURL(h.baseURL, "tiktok", result.AudioURL, result.AudioFilename+".mp3", headers)
+			audioTunnelURL = createStreamURL(c, "tiktok", result.AudioURL, result.AudioFilename+".mp3", headers)
 		}
 
 		return c.JSON(NewPicker(items, audioTunnelURL, result.AudioFilename))
@@ -103,13 +101,13 @@ func (h *Handler) handleTikTok(c *fiber.Ctx, u *url.URL, req *Request) error {
 
 	// video - proxy through tunnel
 	if result.VideoURL != "" {
-		tunnelURL := createStreamURL(h.baseURL, "tiktok", result.VideoURL, result.VideoFilename, headers)
+		tunnelURL := createStreamURL(c, "tiktok", result.VideoURL, result.VideoFilename, headers)
 		return c.JSON(NewTunnel(tunnelURL, result.VideoFilename))
 	}
 
 	// audio - proxy through tunnel
 	if result.AudioURL != "" {
-		tunnelURL := createStreamURL(h.baseURL, "tiktok", result.AudioURL, result.AudioFilename+".mp3", headers)
+		tunnelURL := createStreamURL(c, "tiktok", result.AudioURL, result.AudioFilename+".mp3", headers)
 		return c.JSON(NewTunnel(tunnelURL, result.AudioFilename))
 	}
 
@@ -141,7 +139,7 @@ func (h *Handler) handleTwitter(c *fiber.Ctx, u *url.URL) error {
 			filename += ".mp4"
 		}
 
-		tunnelURL := createStreamURL(h.baseURL, "twitter", item.URL, filename, nil)
+		tunnelURL := createStreamURL(c, "twitter", item.URL, filename, nil)
 		return c.JSON(NewTunnel(tunnelURL, filename))
 	}
 
@@ -155,7 +153,7 @@ func (h *Handler) handleTwitter(c *fiber.Ctx, u *url.URL) error {
 			filename = fmt.Sprintf("%s_%d.mp4", result.Filename, i+1)
 		}
 
-		tunnelURL := createStreamURL(h.baseURL, "twitter", media.URL, filename, nil)
+		tunnelURL := createStreamURL(c, "twitter", media.URL, filename, nil)
 		items = append(items, PickerItem{
 			Type: media.Type,
 			URL:  tunnelURL,

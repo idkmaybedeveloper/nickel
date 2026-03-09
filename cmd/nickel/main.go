@@ -32,7 +32,7 @@ func main() {
 	}))
 
 	// handler
-	handler := api.NewHandler(cfg.UserAgent, cfg.BaseURL)
+	handler := api.NewHandler(cfg.UserAgent)
 
 	app.Get("/", handler.HandleGet)
 	app.Post("/", handler.HandlePost)
