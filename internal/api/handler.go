@@ -4,11 +4,15 @@ import (
 	"fmt"
 	"log/slog"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/idkmaybedeveloper/nickel/internal/services/tiktok"
+	"github.com/idkmaybedeveloper/nickel/internal/services/twitter"
 )
+
+var twitterVideoIndexRegex = regexp.MustCompile(`/video/(\d+)`)
 
 type Request struct {
 	URL             string `json:"url"`
@@ -22,12 +26,14 @@ type Request struct {
 
 type Handler struct {
 	tiktok  *tiktok.Service
+	twitter *twitter.Service
 	baseURL string
 }
 
 func NewHandler(userAgent, baseURL string) *Handler {
 	return &Handler{
 		tiktok:  tiktok.NewService(userAgent),
+		twitter: twitter.NewService(userAgent),
 		baseURL: baseURL,
 	}
 }
@@ -54,6 +60,8 @@ func (h *Handler) HandlePost(c *fiber.Ctx) error {
 	switch {
 	case strings.Contains(host, "tiktok.com") || strings.Contains(host, "tiktok"):
 		return h.handleTikTok(c, parsedURL, &req)
+	case strings.Contains(host, "twitter.com") || strings.Contains(host, "x.com"):
+		return h.handleTwitter(c, parsedURL)
 	default:
 		return c.Status(400).JSON(NewError("error.api.service.unsupported", nil))
 	}
@@ -108,11 +116,60 @@ func (h *Handler) handleTikTok(c *fiber.Ctx, u *url.URL, req *Request) error {
 	return c.Status(400).JSON(NewError("error.api.fetch.empty", nil))
 }
 
+func (h *Handler) handleTwitter(c *fiber.Ctx, u *url.URL) error {
+	// check for /video/x index in URL
+	index := -1
+	if matches := twitterVideoIndexRegex.FindStringSubmatch(u.Path); len(matches) > 1 {
+		fmt.Sscanf(matches[1], "%d", &index)
+		index-- // convert to 0-based
+	}
+
+	result, err := h.twitter.Extract(u, index)
+	if err != nil {
+		slog.Error("twitter extraction failed", "error", err, "url", u.String())
+		return c.Status(400).JSON(NewError(err.Error(), map[string]any{"service": "twitter"}))
+	}
+
+	// single media item
+	if len(result.Media) == 1 {
+		item := result.Media[0]
+		filename := result.Filename
+
+		if item.Type == "photo" {
+			filename += ".jpg"
+		} else {
+			filename += ".mp4"
+		}
+
+		tunnelURL := createStreamURL(h.baseURL, "twitter", item.URL, filename, nil)
+		return c.JSON(NewTunnel(tunnelURL, filename))
+	}
+
+	// multiple media items - picker response
+	items := make([]PickerItem, 0, len(result.Media))
+	for i, media := range result.Media {
+		var filename string
+		if media.Type == "photo" {
+			filename = fmt.Sprintf("%s_%d.jpg", result.Filename, i+1)
+		} else {
+			filename = fmt.Sprintf("%s_%d.mp4", result.Filename, i+1)
+		}
+
+		tunnelURL := createStreamURL(h.baseURL, "twitter", media.URL, filename, nil)
+		items = append(items, PickerItem{
+			Type: media.Type,
+			URL:  tunnelURL,
+		})
+	}
+
+	return c.JSON(NewPicker(items, "", ""))
+}
+
 func (h *Handler) HandleGet(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"cobalt": fiber.Map{
 			"version":  "nickel-0.1.0",
-			"services": []string{"tiktok"},
+			"services": []string{"tiktok", "twitter"},
 		},
 	})
 }

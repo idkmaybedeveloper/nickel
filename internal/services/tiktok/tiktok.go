@@ -97,11 +97,11 @@ func (s *Service) resolveShortLink(u *url.URL) (string, error) {
 		return "", fmt.Errorf("error.api.fetch.fail")
 	}
 
-	// use a trimmed user agent to avoid TikTok redirecting to app store
+	// use a trimmed user agent to avoid tiktok redirecting to app store
 	ua := strings.Split(s.userAgent, " Chrome/1")[0]
 	req.Header.Set("User-Agent", ua)
 
-	// don't follow redirects, we just want the Location header or HTML
+	// dont follow redirects, we just want the Location header or HTML
 	s.client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 		return http.ErrUseLastResponse
 	}

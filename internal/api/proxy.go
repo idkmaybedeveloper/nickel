@@ -39,6 +39,9 @@ var serviceHeaders = map[string]map[string]string{
 	"tiktok": {
 		"Referer": "https://www.tiktok.com/",
 	},
+	"twitter": {
+		"Referer": "https://twitter.com/",
+	},
 }
 
 func createStreamURL(baseURL, service, videoURL, filename string, headers map[string]string) string {
