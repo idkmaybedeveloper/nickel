@@ -5,12 +5,23 @@ import (
 	"log/slog"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/idkmaybedeveloper/nickel/internal/services/tiktok"
 	"github.com/idkmaybedeveloper/nickel/internal/services/twitter"
 )
+
+var (
+	Version   = "11.5"
+	GitBranch = "unknown"
+	GitCommit = "unknown"
+	GitRemote = "idkmaybedeveloper/nickel"
+)
+
+var startTime = strconv.FormatInt(time.Now().UnixMilli(), 10)
 
 var twitterVideoIndexRegex = regexp.MustCompile(`/video/(\d+)`)
 
@@ -166,8 +177,15 @@ func (h *Handler) handleTwitter(c *fiber.Ctx, u *url.URL) error {
 func (h *Handler) HandleGet(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"cobalt": fiber.Map{
-			"version":  "nickel-0.1.0",
-			"services": []string{"tiktok", "twitter"},
+			"version":   Version,
+			"url":       getBaseURL(c) + "/",
+			"startTime": startTime,
+			"services":  []string{"tiktok", "twitter"},
+		},
+		"git": fiber.Map{
+			"branch": GitBranch,
+			"commit": GitCommit,
+			"remote": GitRemote,
 		},
 	})
 }
